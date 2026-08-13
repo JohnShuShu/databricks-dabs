@@ -1,0 +1,57 @@
+# Daily egress + API-usage scan. Serverless compute (no cluster to manage /
+# pay-idle). The task runs run.py, which scans notebooks and queries the
+# system.access.* tables, then writes findings to Unity Catalog Delta tables.
+resources:
+  jobs:
+    egress_monitor:
+      name: "egress + API-usage monitor"
+      description: >-
+        Daily scan for data egress to outside sources. Scans notebook source for
+        egress patterns (requests/httpx/urllib3/boto3/external JDBC), and queries
+        system.access.audit (export/download/credential-vend events, API usage)
+        and system.access.table_lineage (external-path reads/writes). Findings
+        land in ${var.output_catalog}.${var.output_schema}.egress_* Delta tables.
+
+      tags:
+        team: data-fabric
+        bundle: egress_monitor
+
+      trigger:
+        pause_status: ${var.trigger_pause_status}
+        periodic:
+          interval: 1
+          unit: DAYS
+
+      # A scan that overruns should not stack on the next trigger.
+      max_concurrent_runs: 1
+
+      email_notifications:
+        on_failure:
+          - ${var.notification_email}
+
+      tasks:
+        - task_key: scan
+          # Serverless: no job_cluster -> serverless jobs compute. spark_python_task
+          # on serverless requires an environment_key (declared below).
+          environment_key: default
+          spark_python_task:
+            python_file: ../src/egress_monitor/run.py
+            # Config is passed as argv (serverless rejects custom spark.conf keys
+            # with CONFIG_NOT_AVAILABLE, so we do NOT thread config through
+            # spark.conf). run.py also honors DBEGRESS_* env vars / defaults.
+            parameters:
+              - "--mode=spark"
+              - "--catalog=${var.output_catalog}"
+              - "--schema=${var.output_schema}"
+              - "--scan-root=${var.scan_root}"
+              - "--lookback-days=${var.lookback_days}"
+
+      # Serverless environment for the python task. The runtime provides pyspark;
+      # we add the SDK (notebook list/export) and pydantic-settings (config).
+      environments:
+        - environment_key: default
+          spec:
+            client: "3"
+            dependencies:
+              - databricks-sdk
+              - pydantic-settings
