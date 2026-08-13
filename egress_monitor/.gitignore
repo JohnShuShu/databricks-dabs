@@ -1,0 +1,14 @@
+# Real environment registry (may contain workspace hosts / warehouse ids).
+# Commit environments.example.yaml instead. Never commit tokens.
+environments.yaml
+environments.json
+
+# Standalone file output + watermark state.
+egress_output/
+
+# Python / tooling
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+.databricks/
