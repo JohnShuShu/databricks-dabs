@@ -1,0 +1,89 @@
+# Databricks Asset Bundle: egress_monitor
+#
+# Detects and tracks data egress from a workspace to outside sources, and
+# profiles API usage per user/service. Two complementary detection surfaces:
+#   1. Static notebook code scan  -> catches egress *intent* in code (the
+#      `requests` library, external URLs, boto3 puts, external JDBC) BEFORE it
+#      runs. Necessary wherever system.access.outbound_network is empty
+#      (serverless egress logging not enabled).
+#   2. System-table queries        -> actual export/download events and external
+#      lineage (system.access.audit + system.access.table_lineage).
+#
+# This bundle is the IN-WORKSPACE run path (serverless Spark job). The same code
+# also runs STANDALONE against any account/workspace via a SQL warehouse -- see
+# EGRESS_MONITOR.md ("Standalone mode") and environments.example.yaml.
+#
+# PORTABILITY: everything account/workspace-specific is a per-target variable.
+# To add a new account/workspace, add a `targets:` block below with its host,
+# service principal, catalog and schema -- no code changes.
+bundle:
+  name: egress_monitor
+
+variables:
+  workspace_host:
+    description: Workspace URL for this target.
+  service_principal_name:
+    description: SP application id the job runs as (owns the schedule + access).
+  notification_email:
+    description: Address for job failure notifications.
+    default: john.shu@geaerospace.com
+  trigger_pause_status:
+    description: PAUSED or UNPAUSED for the daily trigger.
+    default: PAUSED
+  output_catalog:
+    description: Unity Catalog catalog for the egress tracking tables + volume.
+  output_schema:
+    description: Schema (inside output_catalog) for the egress tracking tables.
+    default: observability
+  scan_root:
+    description: Workspace path to scan for notebooks (recursive). "/" = whole workspace.
+    default: /
+  lookback_days:
+    description: Full-run lookback for audit/lineage when no watermark exists.
+    default: "2"
+
+include:
+  - resources/*.yml
+
+targets:
+  # ── GE DataFabric dev (the workspace this template was built against) ──
+  dev:
+    default: true
+    presets:
+      name_prefix: "[dev] "
+    workspace:
+      host: ${var.workspace_host}
+      # Shared path so the service principal can read the task source files.
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: ${var.service_principal_name}
+    variables:
+      workspace_host: https://dbc-2ff2d226-c0da.cloud.databricks.com
+      service_principal_name: 7fc485dc-93a4-4e78-85e1-2f2842865c4a  # sp-data-fabric-dabs-dev
+      trigger_pause_status: PAUSED
+      output_catalog: fabric_dev
+
+  prod:
+    mode: production
+    workspace:
+      host: ${var.workspace_host}
+    run_as:
+      service_principal_name: ${var.service_principal_name}
+    variables:
+      workspace_host: https://dbc-2ff2d226-c0da.cloud.databricks.com
+      service_principal_name: 7fc485dc-93a4-4e78-85e1-2f2842865c4a  # sp-data-fabric-dabs-dev
+      trigger_pause_status: PAUSED
+      output_catalog: fabric_prod
+
+  # ── Template for another account/workspace (copy, rename, fill in) ─────
+  # other-account:
+  #   workspace:
+  #     host: ${var.workspace_host}
+  #     root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+  #   run_as:
+  #     service_principal_name: ${var.service_principal_name}
+  #   variables:
+  #     workspace_host: https://dbc-XXXXXXXX.cloud.databricks.com
+  #     service_principal_name: <sp-application-id>
+  #     output_catalog: <catalog>
+  #     trigger_pause_status: PAUSED
