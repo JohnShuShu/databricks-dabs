@@ -1,0 +1,50 @@
+# Environment registry for the portable egress monitor.
+#
+# Each entry describes one account/workspace the monitor can run against in
+# STANDALONE mode. Copy to environments.yaml (gitignored) and fill in real
+# values. Run:  python -m egress_monitor.run --registry environments.yaml \
+#                 --environment acme-prod
+#
+# Auth: set ONE of
+#   profile:            a ~/.databrickscfg profile (databricks auth login --profile X)
+#   host + token:       workspace URL + PAT. token may be "env:VAR" to read a PAT
+#                       from an environment variable instead of committing it.
+#   (nothing)           ambient auth (only makes sense in-workspace / spark mode)
+environments:
+
+  # Example: auth via a CLI profile, write to UC-governed output.
+  acme-prod:
+    profile: acme-prod
+    warehouse_id: "abc123def456"          # from: databricks warehouses list
+    output_catalog: acme_gov
+    output_schema: observability
+    output_dir: ./egress_output/acme-prod # CSV/JSON + watermark land here
+    scan_root: /                          # whole workspace; narrow to limit scope
+    labels:
+      account: acme
+      env: prod
+
+  # Example: auth via host + PAT from an env var (good for CI).
+  beta-dev:
+    host: https://dbc-yyyyyyyy-zzzz.cloud.databricks.com
+    token: env:DBX_TOKEN_BETA             # export DBX_TOKEN_BETA=dapi...
+    warehouse_id: "789ghi012jkl"
+    output_catalog: main
+    output_schema: egress_monitor
+    output_dir: ./egress_output/beta-dev
+    scan_root: /Workspace/Shared
+    labels:
+      account: beta
+      env: dev
+
+  # The GE DataFabric dev workspace this template was built against.
+  datafabric-dev:
+    profile: mro-cost-dev
+    warehouse_id: "e9781459f2639f5e"       # Serverless X-Large Warehouse
+    output_catalog: fabric_dev
+    output_schema: observability
+    output_dir: ./egress_output/datafabric-dev
+    scan_root: /
+    labels:
+      account: ge-aero
+      env: dev
