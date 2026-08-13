@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "egress-monitor"
+version = "0.1.0"
+description = "Portable Databricks data-egress & API-usage monitor (standalone SQL-warehouse mode + in-workspace DAB mode)"
+readme = "README.md"
+license = { text = "Proprietary" }
+requires-python = ">=3.10"
+authors = [
+    { name = "GE Aerospace Data Fabric Team", email = "john.shu@geaerospace.com" }
+]
+keywords = ["databricks", "egress", "audit", "monitoring", "data-governance", "unity-catalog"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: System :: Monitoring",
+]
+dependencies = [
+    # Notebook list/export + SQL Statement Execution (standalone mode).
+    "databricks-sdk>=0.20",
+    # Settings (DBEGRESS_ env prefix).
+    "pydantic-settings>=2.0",
+    # YAML environment registry.
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+# `egress-monitor --registry environments.yaml --environment <name>` after install.
+egress-monitor = "egress_monitor.run:main"
+
+[project.urls]
+Documentation = "https://github.com/ge-aero/datafabric_dabs/blob/main/bundles/egress_monitor/EGRESS_MONITOR.md"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+# Tests import from src/ via the package; add it to the path so `pytest` works
+# from the bundle root without an editable install.
+pythonpath = ["src"]
+testpaths = ["tests"]
